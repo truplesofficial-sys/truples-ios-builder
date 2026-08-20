@@ -1,0 +1,16 @@
+{
+  "name": "capacitor-callkit-plugin",
+  "version": "1.0.0",
+  "description": "Capacitor 7 CallKit Native Plugin for iOS",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "scripts": {},
+  "author": "Truples",
+  "license": "MIT",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}
