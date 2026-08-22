@@ -1,0 +1,58 @@
+import { WebPlugin } from '@capacitor/core';
+import type { AppReadyResult, AppUpdateInfo, AppUpdateResult, AutoUpdateEnabled, BundleId, BundleInfo, BundleListResult, CapacitorUpdaterPlugin, ChannelRes, ChannelUrl, CurrentBundleResult, DeviceId, DownloadOptions, GetBundleDownloadSizeOptions, GetBundleDownloadSizeResult, GetAppUpdateInfoOptions, GetChannelRes, LatestVersion, ListChannelsResult, GetMissingBundleFilesOptions, GetMissingBundleFilesResult, MultiDelayConditions, OpenAppStoreOptions, PluginVersion, DeletePreviewResult, PreviewListResult, PreviewUpdateResult, ResetOptions, SetChannelOptions, SetCustomIdOptions, StatsUrl, UnsetChannelOptions, UpdateUrl, BuiltinVersion, AutoUpdateAvailable, SetShakeMenuOptions, ShakeMenuEnabled, SetShakeChannelSelectorOptions, ShakeChannelSelectorEnabled, StartPreviewSessionOptions, TriggerUpdateCheckResult, UpdateFailedEvent } from './definitions';
+export declare class CapacitorUpdaterWeb extends WebPlugin implements CapacitorUpdaterPlugin {
+    setStatsUrl(options: StatsUrl): Promise<void>;
+    setUpdateUrl(options: UpdateUrl): Promise<void>;
+    setChannelUrl(options: ChannelUrl): Promise<void>;
+    download(options: DownloadOptions): Promise<BundleInfo>;
+    next(options: BundleId): Promise<BundleInfo>;
+    isAutoUpdateEnabled(): Promise<AutoUpdateEnabled>;
+    set(options: BundleId): Promise<void>;
+    startPreviewSession(options?: StartPreviewSessionOptions): Promise<void>;
+    listPreviews(): Promise<PreviewListResult>;
+    setPreview(options: BundleId): Promise<void>;
+    resetPreview(): Promise<void>;
+    deletePreview(options: BundleId): Promise<DeletePreviewResult>;
+    checkPreviewUpdate(options: BundleId): Promise<PreviewUpdateResult>;
+    updatePreview(options: BundleId): Promise<PreviewUpdateResult>;
+    getDeviceId(): Promise<DeviceId>;
+    getBuiltinVersion(): Promise<BuiltinVersion>;
+    getPluginVersion(): Promise<PluginVersion>;
+    delete(options: BundleId): Promise<void>;
+    setBundleError(options: BundleId): Promise<BundleInfo>;
+    list(): Promise<BundleListResult>;
+    reset(options?: ResetOptions): Promise<void>;
+    current(): Promise<CurrentBundleResult>;
+    reload(): Promise<void>;
+    getLatest(): Promise<LatestVersion>;
+    triggerUpdateCheck(): Promise<TriggerUpdateCheckResult>;
+    getMissingBundleFiles(options: GetMissingBundleFilesOptions): Promise<GetMissingBundleFilesResult>;
+    getBundleDownloadSize(options: GetBundleDownloadSizeOptions): Promise<GetBundleDownloadSizeResult>;
+    setChannel(options: SetChannelOptions): Promise<ChannelRes>;
+    unsetChannel(options: UnsetChannelOptions): Promise<void>;
+    setCustomId(options: SetCustomIdOptions): Promise<void>;
+    getChannel(): Promise<GetChannelRes>;
+    listChannels(): Promise<ListChannelsResult>;
+    notifyAppReady(): Promise<AppReadyResult>;
+    setMultiDelay(options: MultiDelayConditions): Promise<void>;
+    cancelDelay(): Promise<void>;
+    isAutoUpdateAvailable(): Promise<AutoUpdateAvailable>;
+    getCurrentBundle(): Promise<BundleInfo>;
+    getNextBundle(): Promise<BundleInfo | null>;
+    getFailedUpdate(): Promise<UpdateFailedEvent | null>;
+    setShakeMenu(_options: SetShakeMenuOptions): Promise<void>;
+    isShakeMenuEnabled(): Promise<ShakeMenuEnabled>;
+    setShakeChannelSelector(_options: SetShakeChannelSelectorOptions): Promise<void>;
+    isShakeChannelSelectorEnabled(): Promise<ShakeChannelSelectorEnabled>;
+    getAppId(): Promise<{
+        appId: string;
+    }>;
+    setAppId(options: {
+        appId: string;
+    }): Promise<void>;
+    getAppUpdateInfo(_options?: GetAppUpdateInfoOptions): Promise<AppUpdateInfo>;
+    openAppStore(_options?: OpenAppStoreOptions): Promise<void>;
+    performImmediateUpdate(): Promise<AppUpdateResult>;
+    startFlexibleUpdate(): Promise<AppUpdateResult>;
+    completeFlexibleUpdate(): Promise<void>;
+}
