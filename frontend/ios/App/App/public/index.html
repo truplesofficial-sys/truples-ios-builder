@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <script>
+    // Dynamically handle environment routing: settings for production domain vs development IPs
+    (function () {
+      const isProdDomain = window.location.hostname === 'www.truples.com' || window.location.hostname === 'truples.com';
+      const meta = document.createElement('meta');
+      meta.name = 'robots';
+
+      if (isProdDomain) {
+        meta.content = 'index, follow';
+
+        // 1. Enforce HTTPS redirection for end-to-end security
+        if (window.location.protocol === 'http:') {
+          window.location.href = window.location.href.replace('http:', 'https:');
+        }
+
+        // 2. Silence developer debug console logs for data protection
+        window.console.log = function () { };
+        window.console.debug = function () { };
+        window.console.info = function () { };
+      } else {
+        meta.content = 'noindex, nofollow';
+      }
+      document.head.appendChild(meta);
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <script>
+    // Hook addEventListener to silence chrome 'unload' violation warnings
+    const originalAddEventListener = window.addEventListener;
+    window.addEventListener = function (type, listener, options) {
+      if (type === 'unload') return;
+      return originalAddEventListener.apply(this, arguments);
+    };
+
+    window.global = window;
+    
+    // Check if the current environment is a local development instance (hostname is localhost/127.0.0.1, or on a 192.168.x.x LAN subnet)
+    const isLocalDev = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1' || 
+                       window.location.hostname.startsWith('192.168.') ||
+                       window.location.hostname === '10.0.2.2'; // Android Emulator loopback IP
+
+    if (isLocalDev) {
+      let debugHost = window.location.hostname || 'localhost';
+      if (debugHost === 'localhost' || debugHost === '127.0.0.1') {
+        debugHost = '192.168.0.9'; // Route webview traffic to the PC's debug server IP
+      }
+      const debugServerUrl = 'http://' + debugHost + ':5175';
+
+      window.onerror = function (message, source, lineno, colno, error) {
+        fetch(debugServerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: message,
+            source: source,
+            lineno: lineno,
+            colno: colno,
+            stack: error ? error.stack : ''
+          })
+        }).catch(function () { });
+        return false;
+      };
+      
+      window.onunhandledrejection = function (event) {
+        var reason = event.reason;
+        fetch(debugServerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Unhandled Promise Rejection: ' + (reason ? (reason.message || reason) : ''),
+            source: 'Promise',
+            lineno: 0,
+            colno: 0,
+            stack: reason ? reason.stack : ''
+          })
+        }).catch(function () { });
+      };
+
+      var originalLog = console.log;
+      var originalError = console.error;
+      var originalWarn = console.warn;
+      var sendToDebugServer = function (type, args) {
+        var message = Array.prototype.slice.call(args).map(function (arg) {
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+          }
+          return String(arg);
+        }).join(' ');
+
+        if (message.indexOf('5175') !== -1 || message.indexOf('debug:console') !== -1) {
+          return;
+        }
+
+        fetch(debugServerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: '[' + type.toUpperCase() + '] ' + message,
+            source: 'ConsoleHook',
+            lineno: 0,
+            colno: 0
+          })
+        }).catch(function () { });
+      };
+      console.log = function () {
+        originalLog.apply(console, arguments);
+        sendToDebugServer('log', arguments);
+      };
+      console.error = function () {
+        originalError.apply(console, arguments);
+        sendToDebugServer('error', arguments);
+      };
+      console.warn = function () {
+        originalWarn.apply(console, arguments);
+        sendToDebugServer('warn', arguments);
+      };
+    }
+  </script>
+  <title>Truples</title>
+  <meta name="description" content="Server-blind, zero-retention E2EE messenger protecting your cryptographic sovereignty. No phone numbers, no email, no metadata logs." />
+  <meta name="keywords" content="Truples, E2EE, encrypted messenger, zero retention, privacy messenger, secure communication" />
+  <meta name="google-site-verification" content="6b514ebe72d2c85f" />
+
+  <!-- 📈 Open Graph (OG) Rich Share Preview Meta Tags -->
+  <meta property="og:title" content="Truples" />
+  <meta property="og:description"
+    content="Server-blind, zero-retention E2EE messenger protecting your cryptographic sovereignty." />
+  <meta property="og:image" content="https://truples.com/og-image.png" />
+  <meta property="og:url" content="https://truples.com" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Truples" />
+
+  <!-- 📊 Google Rich Snippet Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MobileApplication",
+      "name": "Truples",
+      "operatingSystem": "Android, iOS",
+      "applicationCategory": "CommunicationApplication",
+      "codeRepository": "https://github.com/truplesofficial-sys/truples",
+      "sameAs": [
+        "https://github.com/truplesofficial-sys/truples"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Server-Blind End-to-End Encrypted Messenger built under the Triple-Zero Principle for ultimate privacy and cryptographic sovereignty. No phone numbers, no emails, no server metadata logging."
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/index-BuMmEXxp.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CeKdn57O.css">
+</head>
+
+<body>
+  <div id="root">
+    <!-- 🔍 Google Global Multi-Language SEO Fallback (Visible to Search Crawlers) -->
+    <div style="display: none;" aria-hidden="true">
+
+      <!-- 🇺🇸 English Version -->
+      <section lang="en">
+        <h1>Truples | Server-Blind End-to-End Encrypted Messenger</h1>
+        <h2>Specialized in Secure Peer-to-Peer Encryption (E2EE)</h2>
+        <p>Truples is a zero-knowledge, censorship-resistant communication platform built to protect your fundamental
+          right to privacy. No metadata logging, zero-retention databases, and decentralized security. Designed as a
+          secure Telegram, Signal, WhatsApp, and Discord alternative for absolute metadata protection and Perfect
+          Forward Secrecy (PFS).</p>
+        <p>Official Technical Specifications and Cryptographic Core: <a href="https://github.com/truplesofficial-sys/truples">https://github.com/truplesofficial-sys/truples</a></p>
+        <ul>
+          <li><strong>Zero Personal Data:</strong> No phone numbers, emails, or identity linkage required to register.
+            Create a secure profile instantly.</li>
+          <li><strong>Zero-Retention Server:</strong> We store zero communication data. Messages are stored locally on
+            your device and permanently destroyed from the server upon receipt.</li>
+          <li><strong>Zero Central Control:</strong> Decentralized Double Ratchet protection ensures maximum security
+            against surveillance and third-party backdoors.</li>
+        </ul>
+      </section>
+
+      <!-- 🇰🇷 Korean Version -->
+      <section lang="ko">
+        <h1>Truples | 서버 블라인드 종단간 암호화 보안 메신저</h1>
+        <h2>도청과 감시가 불가능한 강력한 1:1 익명 대화 및 영상통화</h2>
+        <p>Truples는 개인의 완벽한 프라이버시 권리를 수호하기 위해 설계된 강력한 제로 날리지(Zero-Knowledge) 메신저입니다. 메타데이터 로그를 일절 기록하지 않으며, 서버 데이터 즉시 소각
+          정책을 엄격하게 집행합니다. 텔레그램(Telegram), 시그널(Signal), 와츠앱(WhatsApp), 디스코드(Discord)를 완벽하게 대체하는 프라이버시 중심의 대안 메신저로서 메타데이터
+          보호 및 완전 순방향 비밀성(PFS, Perfect Forward Secrecy)을 기본 제공합니다.</p>
+        <ul>
+          <li><strong>신원 정보 연동 제로 (Zero Identity):</strong> 전화번호나 이메일 인증이 필요 없습니다. 어떠한 디지털 발자국도 남기지 않고 즉시 익명 계정을 생성할 수
+            있습니다.</li>
+          <li><strong>서버 보존 데이터 제로 (Zero Retention):</strong> 대화 내용은 오직 사용자의 스마트폰 로컬에만 보관되며, 상대방에게 전달되는 즉시 서버 데이터베이스에서
+            흔적 없이 완전 삭제됩니다.</li>
+          <li><strong>중앙 통제 및 검열 제로 (Zero Censorship):</strong> Double Ratchet 보안 채널을 사용하여 중앙 기관이나 3자의 불법 감시 및 백도어 침투를
+            물리적으로 원천 차단합니다.</li>
+        </ul>
+      </section>
+
+      <!-- 🇯🇵 Japanese Version -->
+      <section lang="ja">
+        <h1>Truples | 完全暗号化プライバシー保護メッセンジャー</h1>
+        <h2>電話番号不要、サーバーログを一切残さない完全匿名の通信チャット</h2>
+        <p>Truplesは、個人の表現の自由とプライバシー権利を保護するために構築された最先端の暗号化メッセンジャーです。メタデータの追跡を排除し、安全なセキュリティ環境を提供します。</p>
+        <ul>
+          <li><strong>個人情報の登録ゼロ:</strong> 電話番号やメールアドレスなどの情報を必要とせず、ワンクリックで安全な匿名プロフィールを作成できます。</li>
+          <li><strong>サーバー保管ゼロ:</strong> チャット履歴はユーザーの端末にのみ暗号化されて保存され、相手に受信された時点でサーバーから即時に完全消去されます。</li>
+          <li><strong>中央検閲ゼロ:</strong> ダブルラチェット方式の暗号化を採用し、盗聴や監視を完全に防御します。</li>
+        </ul>
+      </section>
+
+      <!-- 🇨🇳 Chinese Version -->
+      <section lang="zh">
+        <h1>Truples | 服务器盲化端到端加密安全通讯软件</h1>
+        <h2>免手机号注册，无服务器日志留存的隐秘聊天工具</h2>
+        <p>Truples 是一款致力于捍卫个人隐私权的安全即时通讯工具。我们严格执行无元数据记录、服务器数据即时销毁政策，阻断一切外部审查与数据泄露。</p>
+        <ul>
+          <li><strong>零个人信息关联:</strong> 无需手机号或邮箱验证，即可瞬间创建一个不留任何数字足迹的安全账户。</li>
+          <li><strong>零服务器留存:</strong> 所有聊天记录仅保存在您的手机设备中，一旦对方接收，服务器便会永久清除该条数据。</li>
+          <li><strong>零集中化监控:</strong> 采用双棘轮(Double Ratchet)加密协议，从根本上防止第三方后门与监听。</li>
+        </ul>
+      </section>
+
+      <!-- 🇪🇸 Spanish Version -->
+      <section lang="es">
+        <h1>Truples | Mensajería cifrada de extremo a extremo (E2EE)</h1>
+        <h2>Privacidad absoluta sin número de teléfono, sin registro de metadatos</h2>
+        <p>Truples es una plataforma de comunicación altamente segura diseñada para proteger su derecho fundamental a la
+          privacidad, libre de vigilancia y con destrucción automática de mensajes en el servidor.</p>
+        <ul>
+          <li><strong>Cero Datos Personales:</strong> No se requieren números de teléfono, correos electrónicos ni
+            vinculación de identidad para registrarse. Cree un perfil seguro al instante.</li>
+          <li><strong>Servidor sin Retención:</strong> Almacenamos cero datos de comunicación. Los mensajes se guardan
+            localmente en su dispositivo y se destruyen permanentemente del servidor al ser recibidos.</li>
+          <li><strong>Cero Control Central:</strong> La protección descentralizada Double Ratchet garantiza la máxima
+            seguridad contra la vigilancia y las puertas traseras de terceros.</li>
+        </ul>
+      </section>
+
+      <!-- 🇫🇷 French Version -->
+      <section lang="fr">
+        <h1>Truples | Messagerie hautement sécurisée et chiffrée de bout en bout</h1>
+        <h2>Confidentialité totale, sans stockage de données sur le serveur, sans censure</h2>
+        <p>Truples est un outil de communication souverain protégeant vos conversations contre toute surveillance avec
+          une politique stricte de zéro rétention de données sur le serveur.</p>
+        <ul>
+          <li><strong>Zéro Donnée Personnelle:</strong> Aucun numéro de téléphone, e-mail ou lien d'identité requis pour
+            s'inscrire. Créez un profil sécurisé instantanément.</li>
+          <li><strong>Serveur sans Rétention:</strong> Nous stockons zéro donnée. Les messages sont enregistrés
+            locallement sur votre appareil et définitivement détruits du serveur dès leur réception.</li>
+          <li><strong>Zéro Contrôle Centralisé:</strong> La protection décentralisée Double Ratchet assure une sécurité
+            maximale contre la surveillance et les portes dérobées tierces.</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+</body>
+
+</html>
