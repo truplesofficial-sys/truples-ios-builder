@@ -1,0 +1,223 @@
+name: Build iOS Safari OTA IPA
+run-name: "⚡ [Safari-OTA] ${{ github.event.head_commit.message || 'Manual Trigger' }}"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+concurrency:
+  group: ios-ota-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios-ota:
+    name: Fast Build iOS Safari OTA IPA
+    runs-on: macos-14
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Select Latest Available Xcode
+        run: |
+          echo "Available Xcode versions:"
+          ls -d /Applications/Xcode*.app
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting latest Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE"
+          fi
+          xcodebuild -version
+
+      # 1. Setup App Store Connect API Private Key
+      - name: Setup App Store Connect API Key
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$HOME/.private_keys"
+          printf "%s\n" "$ASC_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          printf "%s\n" "$ASC_PRIVATE_KEY" > "$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "App Store Connect API Key configured."
+
+      # 2. Resolve Swift Package Manager Dependencies
+      - name: Resolve Swift Package Dependencies
+        run: |
+          cd frontend/ios/App
+          xcodebuild -resolvePackageDependencies -project App.xcodeproj
+
+      # 3. Compile & Archive iOS App with Entitlements Embedded
+      - name: Compile & Archive iOS App
+        run: |
+          cd frontend/ios/App
+          xcodebuild archive \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_ENTITLEMENTS="$(pwd)/App/App.entitlements" 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" || {
+              echo "=== XCODEBUILD COMPILATION ERROR LOG ==="
+              grep -E "error:|fatal error:" "$RUNNER_TEMP/xcodebuild.log" | head -n 30
+              exit 1
+            }
+
+      # 4. Export Signed Ad-Hoc IPA with Cloud Signing
+      - name: Export Signed Ad-Hoc IPA
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          if [ -f "frontend/ios/App/Truples_AdHoc.mobileprovision" ]; then
+            cp -f "frontend/ios/App/Truples_AdHoc.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/Truples.mobileprovision"
+          fi
+
+          cat <<EOF > "$RUNNER_TEMP/ExportOptions.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>teamID</key>
+              <string>T9WAPKGDW6</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>manageAppVersionAndBuildNumber</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          mkdir -p "$RUNNER_TEMP/exported"
+          cd frontend/ios/App
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/exported" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/export.log" || {
+              echo "=== XCODEBUILD EXPORT ERROR LOG ==="
+              grep -E "error:|fatal error:|Provisioning profile" "$RUNNER_TEMP/export.log" | head -n 30
+              exit 1
+            }
+
+          cd "$RUNNER_TEMP/exported"
+          IPA_NAME=$(ls *.ipa | head -n 1)
+          echo "Found exported IPA: $IPA_NAME"
+          cp -f "$IPA_NAME" "$GITHUB_WORKSPACE/Truples.ipa"
+
+      # 4.1 Verify IPA Entitlements
+      - name: Verify IPA Entitlements
+        run: |
+          if [ -n "$IPA_FILE" ]; then
+            unzip -q "$IPA_FILE" -d ipa_contents
+            echo "=== VERIFYING CERTIFICATE SIGNATURE ==="
+            codesign -v -d ipa_contents/Payload/App.app 2>&1 | head -n 10
+            echo "=== VERIFYING EMBEDDED BINARY ENTITLEMENTS ==="
+            codesign -d --entitlements :- ipa_contents/Payload/App.app 2>&1 || true
+            rm -rf ipa_contents
+          fi
+
+      # 5. Publish Direct OTA IPA to GitHub Releases for Instant Safari Download
+      - name: Publish Instant OTA IPA Release
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tag = `v2.0.165-b${context.runNumber}`;
+            
+            // 1. Locate IPA
+            let ipaPath = path.join(process.env.GITHUB_WORKSPACE, 'Truples.ipa');
+            if (!fs.existsSync(ipaPath)) {
+              const findIpa = (dir) => {
+                if (!fs.existsSync(dir)) return null;
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const e of entries) {
+                  const full = path.join(dir, e.name);
+                  if (e.isFile() && e.name.endsWith('.ipa')) return full;
+                  if (e.isDirectory() && !e.name.startsWith('.')) {
+                    const sub = findIpa(full);
+                    if (sub) return sub;
+                  }
+                }
+                return null;
+              };
+              ipaPath = findIpa(process.env.RUNNER_TEMP) || ipaPath;
+            }
+            console.log('Reading IPA binary from:', ipaPath);
+            const ipaBuffer = fs.readFileSync(ipaPath);
+            console.log(`IPA Binary Size: ${(ipaBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+            // 2. Create Release
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Truples iOS Safari OTA Build #${context.runNumber}`,
+              body: 'Automated Fast Safari OTA IPA Build',
+              make_latest: 'true'
+            });
+            console.log('Release created successfully with ID:', release.data.id);
+
+            // 3. Upload IPA Asset
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.data.id,
+              name: 'Truples.ipa',
+              data: ipaBuffer,
+              headers: {
+                'content-type': 'application/octet-stream',
+                'content-length': ipaBuffer.length
+              }
+            });
+            console.log('🎉 Successfully attached Truples.ipa binary to Release!');
+
+      # 6. Automatically Clean up Old Workflow Runs
+      - name: Final Purge of Old Workflow Runs
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              const runs = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 50
+              });
+              for (const run of runs.data.workflow_runs) {
+                if (run.id !== context.runId) {
+                  try {
+                    await github.rest.actions.deleteWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: run.id
+                    });
+                    console.log(`Final purged old workflow run #${run.run_number} (ID: ${run.id})`);
+                  } catch (e) {}
+                }
+              }
+            } catch (e) {}
