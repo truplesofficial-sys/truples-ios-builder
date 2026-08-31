@@ -1,0 +1,26 @@
+{
+	"appId": "com.truples.chat",
+	"appName": "Truples",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "http",
+		"allowNavigation": [
+			"api.truples.com",
+			"*.truples.com",
+			"13.212.67.53"
+		]
+	},
+	"plugins": {
+		"CapacitorUpdater": {
+			"autoUpdate": false,
+			"statsUrl": ""
+		}
+	},
+	"packageClassList": [
+		"AppPlugin",
+		"PushNotificationsPlugin",
+		"CapacitorUpdaterPlugin",
+		"CallKitPlugin"
+	]
+}

@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "UD623P2Y8B.com.truples.chat",
+        "paths": ["/@*", "/openchat/*", "/chat/*", "/"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["UD623P2Y8B.com.truples.chat"]
+  }
+}
