@@ -1,0 +1,13 @@
+# Zero-Source & Zero-Backend Isolation
+backend/
+admin/
+db/
+coturn/
+z_MD/
+.agents/
+src/
+*.p8
+*.key
+*.pem
+.env*
+KEYS.md
